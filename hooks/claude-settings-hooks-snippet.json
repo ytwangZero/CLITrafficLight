@@ -1,0 +1,77 @@
+{
+  "hooks": {
+    "UserPromptSubmit": [
+      {
+        "hooks": [
+          {
+            "type": "command",
+            "command": "python3 /Users/yuting/Documents/AtNTUlife/Others/Zero_BioStat/03_lightagent/hooks/claude_light_hook.py UserPromptSubmit"
+          }
+        ]
+      }
+    ],
+    "PreToolUse": [
+      {
+        "matcher": "*",
+        "hooks": [
+          {
+            "type": "command",
+            "command": "python3 /Users/yuting/Documents/AtNTUlife/Others/Zero_BioStat/03_lightagent/hooks/claude_light_hook.py PreToolUse"
+          }
+        ]
+      }
+    ],
+    "PostToolUse": [
+      {
+        "matcher": "*",
+        "hooks": [
+          {
+            "type": "command",
+            "command": "python3 /Users/yuting/Documents/AtNTUlife/Others/Zero_BioStat/03_lightagent/hooks/claude_light_hook.py PostToolUse"
+          }
+        ]
+      }
+    ],
+    "PermissionRequest": [
+      {
+        "matcher": "*",
+        "hooks": [
+          {
+            "type": "command",
+            "command": "python3 /Users/yuting/Documents/AtNTUlife/Others/Zero_BioStat/03_lightagent/hooks/claude_light_hook.py PermissionRequest"
+          }
+        ]
+      }
+    ],
+    "Stop": [
+      {
+        "hooks": [
+          {
+            "type": "command",
+            "command": "python3 /Users/yuting/Documents/AtNTUlife/Others/Zero_BioStat/03_lightagent/hooks/claude_light_hook.py Stop"
+          }
+        ]
+      }
+    ],
+    "SubagentStop": [
+      {
+        "hooks": [
+          {
+            "type": "command",
+            "command": "python3 /Users/yuting/Documents/AtNTUlife/Others/Zero_BioStat/03_lightagent/hooks/claude_light_hook.py SubagentStop"
+          }
+        ]
+      }
+    ],
+    "SessionEnd": [
+      {
+        "hooks": [
+          {
+            "type": "command",
+            "command": "python3 /Users/yuting/Documents/AtNTUlife/Others/Zero_BioStat/03_lightagent/hooks/claude_light_hook.py SessionEnd"
+          }
+        ]
+      }
+    ]
+  }
+}
