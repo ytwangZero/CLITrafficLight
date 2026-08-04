@@ -1,0 +1,56 @@
+{
+  "hooks": {
+    "UserPromptSubmit": [
+      {
+        "hooks": [
+          { "type": "command", "command": "python3 /Users/yuting/Documents/AtNTUlife/Others/Zero_BioStat/03_lightagent/CLITrafficLight/hooks/codex_light_hook.py" }
+        ]
+      }
+    ],
+    "PreToolUse": [
+      {
+        "matcher": "*",
+        "hooks": [
+          { "type": "command", "command": "python3 /Users/yuting/Documents/AtNTUlife/Others/Zero_BioStat/03_lightagent/CLITrafficLight/hooks/codex_light_hook.py" }
+        ]
+      }
+    ],
+    "PostToolUse": [
+      {
+        "matcher": "*",
+        "hooks": [
+          { "type": "command", "command": "python3 /Users/yuting/Documents/AtNTUlife/Others/Zero_BioStat/03_lightagent/CLITrafficLight/hooks/codex_light_hook.py" }
+        ]
+      }
+    ],
+    "PermissionRequest": [
+      {
+        "matcher": "*",
+        "hooks": [
+          { "type": "command", "command": "python3 /Users/yuting/Documents/AtNTUlife/Others/Zero_BioStat/03_lightagent/CLITrafficLight/hooks/codex_light_hook.py" }
+        ]
+      }
+    ],
+    "Stop": [
+      {
+        "hooks": [
+          { "type": "command", "command": "python3 /Users/yuting/Documents/AtNTUlife/Others/Zero_BioStat/03_lightagent/CLITrafficLight/hooks/codex_light_hook.py" }
+        ]
+      }
+    ],
+    "SubagentStop": [
+      {
+        "hooks": [
+          { "type": "command", "command": "python3 /Users/yuting/Documents/AtNTUlife/Others/Zero_BioStat/03_lightagent/CLITrafficLight/hooks/codex_light_hook.py" }
+        ]
+      }
+    ],
+    "SessionEnd": [
+      {
+        "hooks": [
+          { "type": "command", "command": "python3 /Users/yuting/Documents/AtNTUlife/Others/Zero_BioStat/03_lightagent/CLITrafficLight/hooks/codex_light_hook.py" }
+        ]
+      }
+    ]
+  }
+}

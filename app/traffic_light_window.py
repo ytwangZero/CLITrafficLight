@@ -8,12 +8,9 @@ this is a plain window app instead. No dependency on NSStatusItem, more portable
 
 Requirements this app does NOT set up for you:
     1. ESP32 already flashed with firmware/traffic_light/traffic_light.ino
-    2. Codex CLI or Claude Code CLI already installed and actively writing its
-       state file:
-       - Codex:       ~/Library/Application Support/CodexTrafficLight/state.json
-       - Claude Code: ~/Library/Application Support/CodexTrafficLight/claude-state.json
-         (needs the hooks from hooks/claude-settings-hooks-snippet.json merged
-         into ~/.claude/settings.json)
+    2. Codex CLI or Claude Code CLI itself installed (the "Configure Hooks"
+       buttons wire up the hook config automatically, but won't install the
+       CLI tools)
 
 Closing the window stops monitoring and quits the app.
 """
@@ -115,51 +112,92 @@ def read_aggregate_state(path):
         return None
 
 
-# ---- Claude Code hooks auto-setup ----
+# ---- Hook auto-setup (Claude Code + Codex) ----
 #
-# event name -> matcher ("*" for tool-related events, None for the rest),
-# mirrors hooks/claude-settings-hooks-snippet.json.
-CLAUDE_HOOK_EVENTS = {
-    "UserPromptSubmit": None,
-    "PreToolUse": "*",
-    "PostToolUse": "*",
-    "PermissionRequest": "*",
-    "Stop": None,
-    "SubagentStop": None,
-    "SessionEnd": None,
+# Both tools use the same {"hooks": {EventName: [{matcher?, hooks: [{type,
+# command}]}]}} shape, just in different files. Claude Code passes the event
+# name as argv[1]; Codex only ever sends it via the stdin JSON payload.
+HOOK_INTEGRATIONS = {
+    "claude": {
+        "label": "Claude Code",
+        "script_name": "claude_light_hook.py",
+        "settings_path": os.path.expanduser("~/.claude/settings.json"),
+        "command_includes_event": True,
+        "cli_name": "claude",
+        "cli_hint": "claude.ai/code",
+        "events": {
+            "UserPromptSubmit": None,
+            "PreToolUse": "*",
+            "PostToolUse": "*",
+            "PermissionRequest": "*",
+            "Stop": None,
+            "SubagentStop": None,
+            "SessionEnd": None,
+        },
+    },
+    "codex": {
+        "label": "Codex",
+        "script_name": "codex_light_hook.py",
+        "settings_path": os.path.expanduser("~/.codex/hooks.json"),
+        "command_includes_event": False,
+        "cli_name": "codex",
+        "cli_hint": "developers.openai.com/codex",
+        "events": {
+            "UserPromptSubmit": None,
+            "PreToolUse": "*",
+            "PostToolUse": "*",
+            "PermissionRequest": "*",
+            "Stop": None,
+            "SubagentStop": None,
+            "SessionEnd": None,
+        },
+    },
 }
 
-CLAUDE_SETTINGS_PATH = os.path.expanduser("~/.claude/settings.json")
 
-
-def get_hook_script_path():
-    """Find claude_light_hook.py, whether running as a plain script (hooks/ is
-    a sibling of app/) or bundled into a py2app .app (hooks/ is copied into
+def get_hook_script_path(script_name):
+    """Find a hook script, whether running as a plain script (hooks/ is a
+    sibling of app/) or bundled into a py2app .app (hooks/ is copied into
     Contents/Resources alongside this script)."""
     candidates = []
     resource_path = os.environ.get("RESOURCEPATH")
     if resource_path:
-        candidates.append(os.path.join(resource_path, "hooks", "claude_light_hook.py"))
+        candidates.append(os.path.join(resource_path, "hooks", script_name))
     here = os.path.dirname(os.path.abspath(__file__))
-    candidates.append(os.path.join(here, "hooks", "claude_light_hook.py"))
-    candidates.append(os.path.abspath(os.path.join(here, "..", "hooks", "claude_light_hook.py")))
+    candidates.append(os.path.join(here, "hooks", script_name))
+    candidates.append(os.path.abspath(os.path.join(here, "..", "hooks", script_name)))
     for path in candidates:
         if os.path.exists(path):
             return path
     return None
 
 
-def _hook_command(hook_path, event):
-    return f'python3 "{hook_path}" {event}'
+def _hook_command(hook_path, event, include_event):
+    if include_event:
+        return f'python3 "{hook_path}" {event}'
+    return f'python3 "{hook_path}"'
 
 
-def hooks_configured(hook_path):
-    """True only if every event we care about already has our exact command
-    somewhere in its hook list."""
-    if not hook_path or not os.path.exists(CLAUDE_SETTINGS_PATH):
+def _command_present(bucket, command):
+    return any(
+        isinstance(group, dict)
+        and any(
+            isinstance(h, dict) and h.get("command", "").strip() == command
+            for h in group.get("hooks", [])
+            if isinstance(group.get("hooks", []), list)
+        )
+        for group in bucket
+    )
+
+
+def hooks_configured(integration, hook_path):
+    """True only if every event this integration cares about already has our
+    exact command somewhere in its hook list."""
+    settings_path = integration["settings_path"]
+    if not hook_path or not os.path.exists(settings_path):
         return False
     try:
-        with open(CLAUDE_SETTINGS_PATH, "r", encoding="utf-8") as f:
+        with open(settings_path, "r", encoding="utf-8") as f:
             settings = json.load(f)
     except (json.JSONDecodeError, OSError):
         return False
@@ -168,66 +206,47 @@ def hooks_configured(hook_path):
     hooks = settings.get("hooks", {})
     if not isinstance(hooks, dict):
         return False
-    for event in CLAUDE_HOOK_EVENTS:
-        command = _hook_command(hook_path, event)
+    for event in integration["events"]:
+        command = _hook_command(hook_path, event, integration["command_includes_event"])
         bucket = hooks.get(event, [])
-        if not isinstance(bucket, list):
-            return False
-        found = any(
-            isinstance(group, dict)
-            and any(
-                isinstance(h, dict) and h.get("command", "").strip() == command
-                for h in group.get("hooks", [])
-                if isinstance(group.get("hooks", []), list)
-            )
-            for group in bucket
-        )
-        if not found:
+        if not isinstance(bucket, list) or not _command_present(bucket, command):
             return False
     return True
 
 
-def configure_claude_hooks(hook_path):
-    """Merge our hook commands into ~/.claude/settings.json without touching
-    any other hooks the user already has configured there. Returns the list
-    of event names that were newly added (empty list if already up to date)."""
-    os.makedirs(os.path.dirname(CLAUDE_SETTINGS_PATH), exist_ok=True)
+def configure_hooks(integration, hook_path):
+    """Merge our hook commands into the integration's settings file without
+    touching anything else already configured there. Returns the list of
+    event names newly added (empty if already up to date)."""
+    settings_path = integration["settings_path"]
+    os.makedirs(os.path.dirname(settings_path), exist_ok=True)
 
     settings = {}
-    if os.path.exists(CLAUDE_SETTINGS_PATH):
-        with open(CLAUDE_SETTINGS_PATH, "r", encoding="utf-8") as f:
+    if os.path.exists(settings_path):
+        with open(settings_path, "r", encoding="utf-8") as f:
             raw = f.read().strip()
         if raw:
             try:
                 settings = json.loads(raw)
             except json.JSONDecodeError as e:
                 raise RuntimeError(
-                    f"~/.claude/settings.json isn't valid JSON ({e}). Fix or "
-                    "back up that file by hand first, then try again."
+                    f"{settings_path} isn't valid JSON ({e}). Fix or back it "
+                    "up by hand first, then try again."
                 )
         if not isinstance(settings, dict):
-            raise RuntimeError("~/.claude/settings.json doesn't contain a JSON object at the top level.")
+            raise RuntimeError(f"{settings_path} doesn't contain a JSON object at the top level.")
 
     hooks = settings.setdefault("hooks", {})
     if not isinstance(hooks, dict):
-        raise RuntimeError("The \"hooks\" key in ~/.claude/settings.json isn't a JSON object.")
+        raise RuntimeError(f'The "hooks" key in {settings_path} isn\'t a JSON object.')
 
     added = []
-    for event, matcher in CLAUDE_HOOK_EVENTS.items():
-        command = _hook_command(hook_path, event)
+    for event, matcher in integration["events"].items():
+        command = _hook_command(hook_path, event, integration["command_includes_event"])
         bucket = hooks.setdefault(event, [])
         if not isinstance(bucket, list):
-            continue  # unexpected shape written by something else; don't touch it
-        already = any(
-            isinstance(group, dict)
-            and any(
-                isinstance(h, dict) and h.get("command", "").strip() == command
-                for h in group.get("hooks", [])
-                if isinstance(group.get("hooks", []), list)
-            )
-            for group in bucket
-        )
-        if already:
+            continue  # unexpected shape written by something else; leave it alone
+        if _command_present(bucket, command):
             continue
         entry = {"hooks": [{"type": "command", "command": command}]}
         if matcher is not None:
@@ -235,10 +254,10 @@ def configure_claude_hooks(hook_path):
         bucket.append(entry)
         added.append(event)
 
-    tmp_path = CLAUDE_SETTINGS_PATH + ".tmp"
+    tmp_path = settings_path + ".tmp"
     with open(tmp_path, "w", encoding="utf-8") as f:
         json.dump(settings, f, ensure_ascii=False, indent=2)
-    os.replace(tmp_path, CLAUDE_SETTINGS_PATH)
+    os.replace(tmp_path, settings_path)
     return added
 
 
@@ -301,6 +320,10 @@ class TrafficLightWindow:
         self.running = False
         self.last_code = None
         self._lock = threading.Lock()
+
+        self.hook_script_paths = {}
+        self.hooks_status_labels = {}
+        self.configure_hooks_btns = {}
 
         root.title(APP_TITLE)
         root.configure(bg=BG)
@@ -397,24 +420,10 @@ class TrafficLightWindow:
 
         self._divider(card)
 
-        # ---- Claude Code hooks setup ----
-        self.hook_script_path = get_hook_script_path()
-        setup_row = tk.Frame(card, bg=CARD_BG, padx=22, pady=16)
-        setup_row.pack(fill="x")
-        tk.Label(setup_row, text="CLAUDE CODE SETUP", font=self.font_label,
-                 fg=TEXT_SECONDARY, bg=CARD_BG).pack(anchor="w", pady=(0, 8))
-        self.hooks_status_label = tk.Label(setup_row, text="Checking...", font=self.font_small,
-                                            fg=TEXT_SECONDARY, bg=CARD_BG, anchor="w", justify="left",
-                                            wraplength=232)
-        self.hooks_status_label.pack(anchor="w", pady=(0, 8))
-        self.configure_hooks_btn = RoundedButton(
-            setup_row, text="Configure Hooks", command=self.on_configure_hooks_click,
-            bg_color=TEXT_PRIMARY, hover_color="#3a3a3c", font=self.font_small,
-            width=276, height=34, radius=8,
-        )
-        self.configure_hooks_btn.pack(fill="x")
-        self._refresh_hooks_status()
-
+        # ---- Hooks setup, one section per integration ----
+        self._build_hook_setup_section(card, "codex")
+        self._divider(card)
+        self._build_hook_setup_section(card, "claude")
         self._divider(card)
 
         # ---- Mute ----
@@ -453,6 +462,30 @@ class TrafficLightWindow:
     def _divider(self, parent):
         tk.Frame(parent, bg=BORDER, height=1).pack(fill="x")
 
+    def _build_hook_setup_section(self, card, key):
+        integration = HOOK_INTEGRATIONS[key]
+        hook_path = get_hook_script_path(integration["script_name"])
+        self.hook_script_paths[key] = hook_path
+
+        row = tk.Frame(card, bg=CARD_BG, padx=22, pady=16)
+        row.pack(fill="x")
+        tk.Label(row, text=f"{integration['label'].upper()} SETUP", font=self.font_label,
+                 fg=TEXT_SECONDARY, bg=CARD_BG).pack(anchor="w", pady=(0, 8))
+        status_label = tk.Label(row, text="Checking...", font=self.font_small,
+                                 fg=TEXT_SECONDARY, bg=CARD_BG, anchor="w", justify="left",
+                                 wraplength=232)
+        status_label.pack(anchor="w", pady=(0, 8))
+        self.hooks_status_labels[key] = status_label
+
+        btn = RoundedButton(
+            row, text="Configure Hooks", command=lambda k=key: self.on_configure_hooks_click(k),
+            bg_color=TEXT_PRIMARY, hover_color="#3a3a3c", font=self.font_small,
+            width=276, height=34, radius=8,
+        )
+        btn.pack(fill="x")
+        self.configure_hooks_btns[key] = btn
+        self._refresh_hooks_status(key)
+
     # ---- Event callbacks ----
 
     def on_source_change(self):
@@ -479,42 +512,51 @@ class TrafficLightWindow:
         code = "M" if self.cfg["muted"] else "U"
         threading.Thread(target=self._send_raw, args=(code,), daemon=True).start()
 
-    def _refresh_hooks_status(self):
-        if not self.hook_script_path:
-            self.hooks_status_label.config(
-                text="Couldn't find the hook script bundled with this app.",
+    def _refresh_hooks_status(self, key):
+        integration = HOOK_INTEGRATIONS[key]
+        hook_path = self.hook_script_paths.get(key)
+        status_label = self.hooks_status_labels[key]
+        btn = self.configure_hooks_btns[key]
+
+        if not hook_path:
+            status_label.config(
+                text=f"Couldn't find {integration['script_name']} bundled with this app.",
                 fg=DANGER,
             )
-            self.configure_hooks_btn.pack_forget()
+            btn.pack_forget()
             return
-        if hooks_configured(self.hook_script_path):
-            self.hooks_status_label.config(text="Hooks configured ✓", fg="#2f9e56")
-            self.configure_hooks_btn.set_text("Reconfigure Hooks")
+        if hooks_configured(integration, hook_path):
+            status_label.config(text="Hooks configured ✓", fg="#2f9e56")
+            btn.set_text("Reconfigure Hooks")
         else:
-            claude_installed = shutil.which("claude") is not None
-            note = "" if claude_installed else " (install Claude Code CLI first: claude.ai/code)"
-            self.hooks_status_label.config(
-                text=f"One-time setup so Claude Code can drive this light.{note}",
+            installed = shutil.which(integration["cli_name"]) is not None
+            note = "" if installed else f" (install {integration['label']} CLI first: {integration['cli_hint']})"
+            status_label.config(
+                text=f"One-time setup so {integration['label']} can drive this light.{note}",
                 fg=TEXT_SECONDARY,
             )
-            self.configure_hooks_btn.set_text("Configure Hooks")
+            btn.set_text("Configure Hooks")
 
-    def on_configure_hooks_click(self):
-        if not self.hook_script_path:
-            messagebox.showerror("Hook script missing",
-                                  "Couldn't find claude_light_hook.py bundled with this app.")
+    def on_configure_hooks_click(self, key):
+        integration = HOOK_INTEGRATIONS[key]
+        hook_path = self.hook_script_paths.get(key)
+        if not hook_path:
+            messagebox.showerror(
+                "Hook script missing",
+                f"Couldn't find {integration['script_name']} bundled with this app.",
+            )
             return
         try:
-            added = configure_claude_hooks(self.hook_script_path)
+            added = configure_hooks(integration, hook_path)
         except RuntimeError as e:
-            messagebox.showerror("Couldn't update settings.json", str(e))
+            messagebox.showerror(f"Couldn't update {integration['settings_path']}", str(e))
             return
-        self._refresh_hooks_status()
+        self._refresh_hooks_status(key)
         if added:
             messagebox.showinfo(
-                "Claude Code configured",
+                f"{integration['label']} configured",
                 "Added hooks for: " + ", ".join(added) + ".\n\n"
-                "Restart Claude Code (or run /hooks to check) for it to take effect.",
+                f"Restart {integration['label']} (or run /hooks to check) for it to take effect.",
             )
         else:
             messagebox.showinfo("Already configured", "Every hook was already set up -- nothing to change.")
@@ -646,7 +688,7 @@ class TrafficLightWindow:
                 if code != self.last_code:
                     self._send_raw(code)
                     self.last_code = code
-            time.sleep(2)
+            time.sleep(0.4)
 
     # ---- UI refresh ----
 
@@ -657,7 +699,7 @@ class TrafficLightWindow:
             self.canvas.itemconfig(self.dot, fill=STATE_COLOR.get(state, STATE_COLOR["idle"]))
             self.status_label.config(text=STATE_LABEL.get(state, "Idle"))
             self.sub_label.config(text=f"Watching {self.cfg['source']}")
-        self.root.after(1000, self._poll)
+        self.root.after(400, self._poll)
 
 
 def _force_repaint(root):

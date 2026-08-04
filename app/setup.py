@@ -17,11 +17,12 @@ to preserve permissions in transit).
 from setuptools import setup
 
 APP = ["traffic_light_window.py"]
-# Bundles hooks/claude_light_hook.py into Contents/Resources/hooks/ so the
-# app's "Configure Hooks" button can find it and wire up ~/.claude/settings.json
-# on any machine, without shipping the hooks/ folder separately.
+# Bundles both hook scripts into Contents/Resources/hooks/ so the app's
+# "Configure Hooks" buttons can find them and wire up ~/.claude/settings.json
+# / ~/.codex/hooks.json on any machine, without shipping the hooks/ folder
+# separately.
 DATA_FILES = [
-    ("hooks", ["../hooks/claude_light_hook.py"]),
+    ("hooks", ["../hooks/claude_light_hook.py", "../hooks/codex_light_hook.py"]),
 ]
 OPTIONS = {
     "argv_emulation": False,

@@ -22,7 +22,11 @@
 		</data>
 		<key>Resources/hooks/claude_light_hook.py</key>
 		<data>
-		OZeK/OyDXlFVMAEvH1A8zFvMVHI=
+		XCORZVEL5illH9RIzzl6qJ5AmK4=
+		</data>
+		<key>Resources/hooks/codex_light_hook.py</key>
+		<data>
+		DbkybUwPu/rmf8abO7Fch5iZ8KM=
 		</data>
 		<key>Resources/include/python3.12/pyconfig.h</key>
 		<data>
@@ -3470,7 +3474,7 @@
 		</data>
 		<key>Resources/lib/python312.zip</key>
 		<data>
-		uyObZYzQaBgdT7zjfswu/cYvW48=
+		lL33+v4sWH0YnQwn40aaPNk9TPc=
 		</data>
 		<key>Resources/openssl.ca/cert.pem</key>
 		<data>
@@ -3482,11 +3486,11 @@
 		</data>
 		<key>Resources/site.pyc</key>
 		<data>
-		1cdI/Rr/gkvGmgvE5STRqbfPE64=
+		GFdoHYovGEj40CC8ninzlz7VvQY=
 		</data>
 		<key>Resources/traffic_light_window.py</key>
 		<data>
-		xVs46q/eJNkMghkjcmv8U2gW8yg=
+		KKOD6kt1+Syw7zYBo8EtDB3vaM0=
 		</data>
 		<key>Resources/zlib.cpython-312-darwin.so</key>
 		<data>
@@ -3613,7 +3617,14 @@
 		<dict>
 			<key>hash2</key>
 			<data>
-			LgDZZInGXmSgHCg56csTG0R6BudILF4xaOSLWiVoZs8=
+			MPp3xy0YHjEou8K4EUUzaHXslBz7E9pirqGL9oZ1xTw=
+			</data>
+		</dict>
+		<key>Resources/hooks/codex_light_hook.py</key>
+		<dict>
+			<key>hash2</key>
+			<data>
+			nRKA8Lq+x2pK1E7nVy8oZu3/ORyysyhJa6tfat7cV+U=
 			</data>
 		</dict>
 		<key>Resources/include/python3.12/pyconfig.h</key>
@@ -9652,7 +9663,7 @@
 		<dict>
 			<key>hash2</key>
 			<data>
-			eErJR3LSnAYkmduSZIpZuG3KjK8KvYAu4PAPAaoLyIc=
+			wMjCXUYQHcH9RQZ5e2mpD9eJwykmcS0x5342UgG6yvM=
 			</data>
 		</dict>
 		<key>Resources/openssl.ca/cert.pem</key>
@@ -9673,14 +9684,14 @@
 		<dict>
 			<key>hash2</key>
 			<data>
-			WkpZpjVq5F/z7/BtNl+iqmer5JzUJStaVcVra6VTg2k=
+			SNUAXQLRyPCkfKMcKPQ0lJLF8ENogds9FqgWjeBV5t0=
 			</data>
 		</dict>
 		<key>Resources/traffic_light_window.py</key>
 		<dict>
 			<key>hash2</key>
 			<data>
-			ygnr9i3S/vFwIK6YHkguPUf1nrNh06VpoQ2yJTwaEJ4=
+			HdaCtaazius40JDStfPey93sM39+eSzbbSIefUb6QYE=
 			</data>
 		</dict>
 		<key>Resources/zlib.cpython-312-darwin.so</key>

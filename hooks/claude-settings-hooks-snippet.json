@@ -5,7 +5,7 @@
         "hooks": [
           {
             "type": "command",
-            "command": "python3 /Users/yuting/Documents/AtNTUlife/Others/Zero_BioStat/03_lightagent/hooks/claude_light_hook.py UserPromptSubmit"
+            "command": "python3 /Users/yuting/Documents/AtNTUlife/Others/Zero_BioStat/03_lightagent/CLITrafficLight/hooks/claude_light_hook.py UserPromptSubmit"
           }
         ]
       }
@@ -16,7 +16,7 @@
         "hooks": [
           {
             "type": "command",
-            "command": "python3 /Users/yuting/Documents/AtNTUlife/Others/Zero_BioStat/03_lightagent/hooks/claude_light_hook.py PreToolUse"
+            "command": "python3 /Users/yuting/Documents/AtNTUlife/Others/Zero_BioStat/03_lightagent/CLITrafficLight/hooks/claude_light_hook.py PreToolUse"
           }
         ]
       }
@@ -27,7 +27,7 @@
         "hooks": [
           {
             "type": "command",
-            "command": "python3 /Users/yuting/Documents/AtNTUlife/Others/Zero_BioStat/03_lightagent/hooks/claude_light_hook.py PostToolUse"
+            "command": "python3 /Users/yuting/Documents/AtNTUlife/Others/Zero_BioStat/03_lightagent/CLITrafficLight/hooks/claude_light_hook.py PostToolUse"
           }
         ]
       }
@@ -38,7 +38,7 @@
         "hooks": [
           {
             "type": "command",
-            "command": "python3 /Users/yuting/Documents/AtNTUlife/Others/Zero_BioStat/03_lightagent/hooks/claude_light_hook.py PermissionRequest"
+            "command": "python3 /Users/yuting/Documents/AtNTUlife/Others/Zero_BioStat/03_lightagent/CLITrafficLight/hooks/claude_light_hook.py PermissionRequest"
           }
         ]
       }
@@ -48,7 +48,7 @@
         "hooks": [
           {
             "type": "command",
-            "command": "python3 /Users/yuting/Documents/AtNTUlife/Others/Zero_BioStat/03_lightagent/hooks/claude_light_hook.py Stop"
+            "command": "python3 /Users/yuting/Documents/AtNTUlife/Others/Zero_BioStat/03_lightagent/CLITrafficLight/hooks/claude_light_hook.py Stop"
           }
         ]
       }
@@ -58,7 +58,7 @@
         "hooks": [
           {
             "type": "command",
-            "command": "python3 /Users/yuting/Documents/AtNTUlife/Others/Zero_BioStat/03_lightagent/hooks/claude_light_hook.py SubagentStop"
+            "command": "python3 /Users/yuting/Documents/AtNTUlife/Others/Zero_BioStat/03_lightagent/CLITrafficLight/hooks/claude_light_hook.py SubagentStop"
           }
         ]
       }
@@ -68,7 +68,7 @@
         "hooks": [
           {
             "type": "command",
-            "command": "python3 /Users/yuting/Documents/AtNTUlife/Others/Zero_BioStat/03_lightagent/hooks/claude_light_hook.py SessionEnd"
+            "command": "python3 /Users/yuting/Documents/AtNTUlife/Others/Zero_BioStat/03_lightagent/CLITrafficLight/hooks/claude_light_hook.py SessionEnd"
           }
         ]
       }

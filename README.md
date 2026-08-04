@@ -18,6 +18,8 @@ bridge/bridge.py                           CLI bridge: reads state.json, sends c
 bridge/requirements.txt                    Python deps for bridge.py
 hooks/claude_light_hook.py                 Claude Code hook script that writes claude-state.json
 hooks/claude-settings-hooks-snippet.json   Hooks config to merge into ~/.claude/settings.json
+hooks/codex_light_hook.py                  Codex hook script that writes state.json
+hooks/codex-hooks-snippet.json             Hooks config to merge into ~/.codex/hooks.json
 app/traffic_light_window.py                Desktop GUI app (no command line needed)
 app/setup.py                               py2app packaging config for the GUI app
 ```
@@ -105,34 +107,39 @@ python3 bridge.py --dry-run --state-path /tmp/fake_state.json --once  # test wit
 
 `app/traffic_light_window.py` is a no-terminal GUI: pick USB or WiFi, pick Codex or Claude Code, click Start Monitoring. See [app/README.md](app/README.md) for building and distributing it as a standalone `.app`.
 
-## Claude Code integration
+## Claude Code and Codex integration
 
-`hooks/claude_light_hook.py` writes a separate state file from Codex's (they don't share one):
+Both CLIs have their own hook script and write to separate state files (they don't share one):
 
 ```
 Codex   -> ~/Library/Application Support/CodexTrafficLight/state.json        (override: CODEX_TRAFFIC_LIGHT_STATE_PATH)
 Claude  -> ~/Library/Application Support/CodexTrafficLight/claude-state.json (override: CLAUDE_TRAFFIC_LIGHT_STATE_PATH)
 ```
 
-Event mapping: `UserPromptSubmit`/`PreToolUse`/`PostToolUse` → working, `PermissionRequest` → waiting (a real permission dialog), `Stop`/`SubagentStop` → done, `SessionEnd` → light off. Stale entries (session ended abnormally) expire automatically so the light never gets stuck.
+Event mapping (same for both): `UserPromptSubmit`/`PreToolUse`/`PostToolUse` → working, `PermissionRequest` → waiting (a real permission/approval prompt), `Stop`/`SubagentStop` → done, `SessionEnd` → light off. Stale entries (session ended abnormally) expire automatically so the light never gets stuck.
 
-**Easiest path:** use the desktop app's "Configure Hooks" button — it merges the required config into `~/.claude/settings.json` automatically, without touching anything else already there.
+**Easiest path:** use the desktop app's "Configure Hooks" buttons (one per CLI, under Codex Setup / Claude Code Setup) — each merges the required config into the right settings file automatically, without touching anything else already there. Safe to click again later; it won't add duplicates.
 
-**Manual path:**
+**Manual path — Claude Code:**
 
 1. Merge the `hooks` object from `hooks/claude-settings-hooks-snippet.json` into `~/.claude/settings.json` (merge each event's array into any existing one — don't overwrite the whole file).
 2. Fix the `command` paths to match where you put this repo.
 3. Run `/hooks` inside Claude Code to confirm it loaded.
 4. Have a normal conversation and watch `~/Library/Application Support/CodexTrafficLight/claude-state.json` update.
 
-## Codex integration
+**Manual path — Codex:**
 
-This repo has no Codex-side hook script — Codex's state file is expected to be maintained by a separate, external tool (referred to here as `codex-traffic-light-mxp`) that isn't part of this project. If you have it, point `bridge.py --source codex` (or the app's "Watching: Codex" option) at it. Otherwise this half of the integration is up to you to build.
+1. Merge the `hooks` object from `hooks/codex-hooks-snippet.json` into `~/.codex/hooks.json` (create the file if it doesn't exist).
+2. Fix the `command` paths to match where you put this repo.
+3. Codex requires an explicit trust step before hooks run: start Codex and run `/hooks` to review and approve them.
+4. Have a normal conversation and watch `~/Library/Application Support/CodexTrafficLight/state.json` update.
 
-Neither integration talks to the desktop chat apps (Claude.ai desktop, ChatGPT desktop, etc.) — only their CLI tools expose the hook/event mechanism this relies on.
+Unlike Claude Code, Codex never passes the event name as a command-line argument — the hook script reads `hook_event_name` from the stdin JSON payload only, and always prints `{}` on exit (Codex requires valid JSON stdout from `Stop`/`SubagentStop` hooks).
+
+Neither integration talks to the desktop chat apps (Claude.ai desktop, ChatGPT desktop, etc.) — only the CLI tools expose the hook/event mechanism this relies on.
 
 ## Known limitations
 
 - CLI tools only, not desktop chat apps.
 - No code signing/notarization on the packaged app — first launch needs a right-click → Open on each new machine.
-- Codex integration depends on external tooling not included here.
+- If you move this repo's folder after already running "Configure Hooks" once, the old path stays in the settings file (harmless, just a dead entry) until you re-run "Configure Hooks" from the app at its new location.

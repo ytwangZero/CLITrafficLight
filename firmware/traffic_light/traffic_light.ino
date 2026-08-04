@@ -183,7 +183,17 @@ void loop() {
   if (wifiReady) server.handleClient();
 
   if (Serial.available()) {
-    dispatch(Serial.read());
+    char c = Serial.read();
+    // The Python bridge/app write commands as "R\n" over USB serial. Drain
+    // that trailing newline/CR here, before dispatch() -- otherwise it's
+    // still sitting in the buffer the instant enterWaiting() checks
+    // Serial.available() to see if a new command arrived, and its blink
+    // loop exits immediately (solid red, no blink/buzz) instead of running.
+    delay(2); // give the trailing byte a moment to arrive over USB
+    while (Serial.available() && (Serial.peek() == '\n' || Serial.peek() == '\r')) {
+      Serial.read();
+    }
+    dispatch(c);
   } else if (pendingWifiCommand != 0) {
     char c = pendingWifiCommand;
     pendingWifiCommand = 0;

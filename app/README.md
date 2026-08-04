@@ -1,15 +1,15 @@
 # CLI Traffic Light — desktop app
 
-A no-terminal GUI for people who don't want to run `bridge.py` by hand. One small window: start/stop monitoring, USB or WiFi, watch Codex or Claude Code, one-click Claude Code hook setup, mute buzzer. USB mode auto-detects the ESP32's serial port.
+A no-terminal GUI for people who don't want to run `bridge.py` by hand. One small window: start/stop monitoring, USB or WiFi, watch Codex or Claude Code, one-click hook setup for both, mute buzzer. USB mode auto-detects the ESP32's serial port.
 
 ## Requirements this app does NOT set up for you
 
 1. The ESP32 already flashed with `firmware/traffic_light/traffic_light.ino` and wired up (see the main [README](../README.md); WiFi mode also needs the device already paired to a network).
 2. Codex CLI or Claude Code CLI (the actual command-line tool, not a desktop chat app) installed.
 
-For Claude Code, you no longer need to hand-edit JSON: `hooks/claude_light_hook.py` ships inside the app bundle (`Contents/Resources/hooks/`), and the app's **Configure Hooks** button merges the required entries into `~/.claude/settings.json` automatically, without touching anything else already in there. You still need to install Claude Code CLI yourself — the app won't do that for you.
+You no longer need to hand-edit JSON for either tool: `hooks/claude_light_hook.py` and `hooks/codex_light_hook.py` both ship inside the app bundle (`Contents/Resources/hooks/`), and the app has a **Configure Hooks** button under each of "Codex Setup" and "Claude Code Setup" that merges the required entries into `~/.codex/hooks.json` / `~/.claude/settings.json` automatically, without touching anything else already in there. Clicking it again later is safe — it won't add duplicates. You still need to install the CLI itself — the app won't do that for you.
 
-Codex has no equivalent automation here — this repo doesn't include a Codex-side hook script. Codex's state file is expected to come from a separate external tool (`codex-traffic-light-mxp`) not included in this project; if you don't have it, the Codex option won't do anything.
+Codex additionally requires a one-time trust step the app can't do for you: after configuring, start Codex and run `/hooks` to review and approve the hook before it will actually fire.
 
 ## Building the standalone .app (one-time, on your machine)
 
@@ -37,6 +37,7 @@ codesign --force --deep -s - "dist/CLITrafficLight.app"
    - **Start/Stop Monitoring** — begin/stop reading the state file and driving the light.
    - **Connection** — USB (auto-detects the port) or WiFi (address field, defaults to `cli-light.local`).
    - **Watching** — Codex or Claude Code.
+   - **Codex Setup** — install Codex CLI first, then click **Configure Hooks**, then run `/hooks` inside Codex once to trust it.
    - **Claude Code Setup** — install Claude Code CLI first (claude.ai/code), then click **Configure Hooks**.
    - **Mute buzzer** — buzzer off, light unaffected.
    - Closing the window stops monitoring (turns the light off first) and quits.

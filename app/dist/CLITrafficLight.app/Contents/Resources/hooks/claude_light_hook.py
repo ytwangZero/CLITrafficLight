@@ -2,33 +2,36 @@
 """
 Claude Code Traffic Light Hook
 
-给Claude Code的hooks机制调用,把hook事件翻译成state.json里的状态。
+Called by Claude Code's hooks mechanism; translates hook events into the
+state stored in state.json.
 
-默认写到自己独立的一份状态文件(跟Codex的state.json分开,不共用),通过
-CLAUDE_TRAFFIC_LIGHT_STATE_PATH 环境变量可以覆盖路径。同一时间只跑Codex或者
-只跑Claude Code的话,bridge.py用 --source codex / --source claude 选择监控哪一份
-状态文件就行,互不干扰。
+Writes to its own state file (separate from Codex's, not shared), overridable
+via CLAUDE_TRAFFIC_LIGHT_STATE_PATH. bridge.py picks which one to watch with
+--source codex / --source claude.
 
-用法(在Claude Code的settings.json hooks配置里调用,事件名作为第一个参数传入):
+Usage (invoked from Claude Code's settings.json hooks config, event name as
+the first argument):
     python3 claude_light_hook.py <EventName>
 
-事件名优先取命令行参数,取不到时退回读取stdin JSON里的 hook_event_name 字段。
+The event name is taken from argv first, falling back to the stdin JSON's
+hook_event_name field.
 
-事件映射:
-    UserPromptSubmit / PreToolUse / PostToolUse -> working (黄灯)
-    PermissionRequest                           -> waiting (红灯,Claude Code真实弹出权限确认框时触发)
-    Stop / SubagentStop                         -> done (绿灯)
-    SessionEnd                                  -> 直接删掉这个session的记录(退出Claude Code就熄灯)
-    其它事件                                     -> 忽略,不改变状态
+Event mapping:
+    UserPromptSubmit / PreToolUse / PostToolUse -> working
+    PermissionRequest                           -> waiting (a real permission dialog)
+    Stop / SubagentStop                         -> done
+    SessionEnd                                  -> drop this session's entry (light off)
+    anything else                               -> ignored
 
-注:PermissionRequest触发红灯后,Claude Code本身不会再单独发一个"已批准"事件,
-所以加了PostToolUse(工具执行完毕)映射回working,避免用户点批准后灯一直卡在红色
-直到整轮对话结束才变绿。
+PostToolUse is mapped to working because Claude Code doesn't fire a separate
+"approved" event after PermissionRequest -- without it the light would stay
+stuck on waiting/red until the whole turn ends.
 
-多个并发session分别记录在tasks字典里,按下面优先级聚合出aggregate_state:
-    waiting > working > 10分钟内的done > idle
+Concurrent sessions are tracked in the tasks dict; aggregate_state is derived
+by priority: waiting > working > done (within 10 min) > idle.
 
-这个脚本任何异常都会静默吞掉、正常退出(exit 0),不应该影响Claude Code本身的行为。
+Any exception here is swallowed and the script exits 0 so it can never affect
+Claude Code itself.
 """
 
 import json
@@ -44,11 +47,11 @@ STATE_PATH = os.path.expanduser(
 )
 
 DONE_EXPIRY_SECONDS = 10 * 60
-# working/waiting 状态如果超过这么久没被新事件刷新,视为那次session被异常中断了
-# (强制关终端、电脑休眠等),不再计入聚合状态,避免灯永远卡住。正常使用时每次
-# 工具调用都会刷新,不会接近这个时长。
+# A working/waiting entry this old is assumed to be from a session that ended
+# abnormally (terminal killed, machine slept) rather than via a proper event,
+# so it's excluded from the aggregate instead of leaving the light stuck.
 STALE_EXPIRY_SECONDS = 20 * 60
-# 太久没更新的session记录,直接从状态文件里清掉,避免越堆越多
+# Entries older than this are dropped entirely to keep the state file tidy.
 PRUNE_AFTER_SECONDS = 24 * 60 * 60
 
 
@@ -97,9 +100,6 @@ def compute_aggregate(tasks):
         state = info.get("state")
         updated_at = info.get("updated_at", 0)
         age = now - updated_at
-        # working/waiting 如果太久没更新,大概率是那次session没正常结束就被强制关掉了
-        # (直接关终端、电脑休眠等),不应该让灯永远卡在黄/红。正常使用时这两个状态会
-        # 频繁被hook事件刷新,不会接近这个超时时间。
         if state == "waiting" and age <= STALE_EXPIRY_SECONDS:
             has_waiting = True
         elif state == "working" and age <= STALE_EXPIRY_SECONDS:
@@ -116,7 +116,6 @@ def compute_aggregate(tasks):
 
 
 def prune_stale_tasks(tasks):
-    """清掉太久没更新的session记录,避免状态文件里堆积僵尸session。"""
     now = time.time()
     return {
         key: info
@@ -132,7 +131,7 @@ def determine_state(event, payload):
         return "waiting"
     if event in ("Stop", "SubagentStop"):
         return "done"
-    return None  # 不认识/不关心的事件
+    return None
 
 
 def main():
@@ -146,8 +145,6 @@ def main():
     data = load_state(STATE_PATH)
 
     if event == "SessionEnd":
-        # 用户退出Claude Code(正常退出,比如/exit或者Ctrl+D触发的),
-        # 直接把这个session的记录删掉,不再计入聚合状态,灯马上灭。
         data["tasks"].pop(task_key, None)
     else:
         new_state = determine_state(event, payload)
@@ -170,6 +167,5 @@ if __name__ == "__main__":
     try:
         main()
     except Exception:
-        # hook脚本出任何问题都不应该影响Claude Code本身,静默失败退出0
         pass
     sys.exit(0)
